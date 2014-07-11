@@ -20,6 +20,8 @@
 #import "CDFatArch.h"
 #import "CDSearchPathState.h"
 #import "CDSymoblsGeneratorVisitor.h"
+#import "CDXibStoryboardParser.h"
+#import "CDXibStoryBoardProcessor.h"
 
 void print_usage(void)
 {
@@ -339,6 +341,9 @@ int main(int argc, char *argv[])
                         visitor.classFilter = classFilter;
                         visitor.ignoreSymbols = ignoreSymbols;
                         [classDump recursivelyVisit:visitor];
+                        CDXibStoryBoardProcessor *processor = [[CDXibStoryBoardProcessor alloc] init];
+                        [processor obfuscateFilesUsingSymbols:visitor.symbols];
+//                        [parser obfuscateFilesUsingSymbols:visitor.symbols];
                     } else if (shouldGenerateSeparateHeaders) {
                         CDMultiFileVisitor *multiFileVisitor = [[CDMultiFileVisitor alloc] init];
                         multiFileVisitor.classDump = classDump;

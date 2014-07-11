@@ -1,4 +1,5 @@
 PODS:
+  - GDataXML-HTML (1.1.0)
   - Kiwi/ARC (2.2.4)
   - Kiwi/NonARC (2.2.4)
   - Kiwi/XCTest (2.2.4):
@@ -6,9 +7,11 @@ PODS:
     - Kiwi/NonARC
 
 DEPENDENCIES:
+  - GDataXML-HTML
   - Kiwi/XCTest
 
 SPEC CHECKSUMS:
+  GDataXML-HTML: 3f6537789b55edbc4d83283566f9779abd9680bc
   Kiwi: c73667f2b84cbf36f1a3830267c5a4ae8dcbd8ba
 
 COCOAPODS: 0.33.1
