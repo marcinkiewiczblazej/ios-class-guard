@@ -2,20 +2,7 @@
 #import "GDataXMLNode.h"
 
 
-@implementation CDXibStoryboardParser {
-
-}
-
-- (NSArray *)symbolsInFile:(NSURL *)fileUrl {
-    NSMutableArray *array = [NSMutableArray array];
-
-    NSData *data = [NSData dataWithContentsOfURL:fileUrl];
-    GDataXMLDocument *doc = [[GDataXMLDocument alloc] initWithData:data error:nil];
-
-    [self addSymbolsFromNode:doc.rootElement toArray:array];
-
-    return array;
-}
+@implementation CDXibStoryboardParser
 
 - (void)addSymbolsFromNode:(GDataXMLElement *)xmlDictionary toArray:(NSMutableArray *)symbolsArray {
     NSArray *childNodes = xmlDictionary.children;
@@ -40,41 +27,6 @@
             [self addSymbolsFromNode:childNode toArray:symbolsArray];
         }
     }
-}
-
-
-- (void)obfuscateFilesUsingSymbols:(NSDictionary *)symbols {
-    NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSArray *keys = [NSArray arrayWithObject:NSURLIsDirectoryKey];
-    NSURL *directoryURL = [NSURL URLWithString:@"."];
-
-    NSDirectoryEnumerator *enumerator = [fileManager
-        enumeratorAtURL:directoryURL
-        includingPropertiesForKeys:keys
-        options:0
-        errorHandler:^(NSURL *url, NSError *error) {
-            // Handle the error.
-            // Return YES if the enumeration should continue after the error.
-            return YES;
-    }];
-
-    for (NSURL *url in enumerator) {
-        NSError *error;
-        NSNumber *isDirectory = nil;
-        if ([url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:&error] && ![isDirectory boolValue]) {
-            if ([url.absoluteString hasSuffix:@".xib"] || [url.absoluteString hasSuffix:@".storyboard"]) {
-                [self obfuscatedXmlData:url symbols:symbols];
-            }
-        }
-    }
-}
-
-- (NSData *)obfuscatedXmlData:(NSData *)data symbols:(NSDictionary *)symbols {
-    GDataXMLDocument *doc = [[GDataXMLDocument alloc] initWithData:data error:nil];
-
-    [self obfuscateElement:doc.rootElement usingSymbols:symbols];
-
-    return doc.XMLData;
 }
 
 - (void)obfuscateElement:(GDataXMLElement *)element usingSymbols:(NSDictionary *)symbols {

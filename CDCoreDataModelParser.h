@@ -2,5 +2,5 @@
 #import "CDParserSharedBase.h"
 
 
-@interface CDXibStoryboardParser : CDParserSharedBase
+@interface CDCoreDataModelParser : CDParserSharedBase
 @end

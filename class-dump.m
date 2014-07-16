@@ -3,25 +3,16 @@
 //  This file is part of class-dump, a utility for examining the Objective-C segment of Mach-O files.
 //  Copyright (C) 1997-1998, 2000-2001, 2004-2014 Steve Nygard.
 
-#include <stdio.h>
-#include <libc.h>
-#include <unistd.h>
 #include <getopt.h>
-#include <stdlib.h>
-#include <mach-o/arch.h>
-
 #import "CDClassDump.h"
 #import "CDFindMethodVisitor.h"
-#import "CDClassDumpVisitor.h"
-#import "CDMultiFileVisitor.h"
-#import "CDFile.h"
 #import "CDMachOFile.h"
 #import "CDFatFile.h"
 #import "CDFatArch.h"
 #import "CDSearchPathState.h"
-#import "CDSymoblsGeneratorVisitor.h"
-#import "CDXibStoryboardParser.h"
+#import "CDSymbolsGeneratorVisitor.h"
 #import "CDXibStoryBoardProcessor.h"
+#import "CDCoreDataModelProcessor.h"
 
 void print_usage(void)
 {
@@ -56,12 +47,10 @@ int main(int argc, char *argv[])
 {
     @autoreleasepool {
         NSString *searchString;
-        BOOL shouldGenerateSeparateHeaders = NO;
         BOOL shouldListArches = NO;
         BOOL shouldPrintVersion = NO;
         CDArch targetArch;
         BOOL hasSpecifiedArch = NO;
-        BOOL generateSymbolsTable = NO;
         NSString *outputPath;
         NSMutableSet *hiddenSections = [NSMutableSet set];
         NSMutableArray *classFilter = [NSMutableArray new];
@@ -75,15 +64,14 @@ int main(int argc, char *argv[])
             { "show-imp-addr",           no_argument,       NULL, 'A' },
             { "match",                   required_argument, NULL, 'C' },
             { "find",                    required_argument, NULL, 'f' },
-            { "generate-multiple-files", no_argument,       NULL, 'H' },
             { "sort-by-inheritance",     no_argument,       NULL, 'I' },
             { "output-dir",              required_argument, NULL, 'o' },
             { "recursive",               no_argument,       NULL, 'r' },
             { "sort",                    no_argument,       NULL, 's' },
             { "sort-methods",            no_argument,       NULL, 'S' },
-                { "generate-symbols-table", no_argument, NULL, 'G' },
-                { "filter-class", no_argument, NULL, 'F' },
-                { "ignore-symbols", no_argument, NULL, 'i' },
+            { "generate-symbols-table",  no_argument,       NULL, 'G' },
+            { "filter-class",            no_argument,       NULL, 'F' },
+            { "ignore-symbols",          no_argument,       NULL, 'i' },
             { "arch",                    required_argument, NULL, CD_OPT_ARCH },
             { "list-arches",             no_argument,       NULL, CD_OPT_LIST_ARCHES },
             { "suppress-header",         no_argument,       NULL, 't' },
@@ -101,14 +89,12 @@ int main(int argc, char *argv[])
         }
 
         CDClassDump *classDump = [[CDClassDump alloc] init];
-
-        generateSymbolsTable = YES;
         classDump.shouldProcessRecursively = YES;
         classDump.shouldIterateInReverse = YES;
         // classDump.maxRecursiveDepth = 1;
         // classDump.forceRecursiveAnalyze = @[@"Foundation"];
 
-        while ( (ch = getopt_long(argc, argv, "aGAC:f:HIo:rRsStF:i:", longopts, NULL)) != -1) {
+        while ( (ch = getopt_long(argc, argv, "aGAC:f:Io:rRsStF:i:", longopts, NULL)) != -1) {
             switch (ch) {
                 case CD_OPT_ARCH: {
                     NSString *name = [NSString stringWithUTF8String:optarg];
@@ -178,7 +164,6 @@ int main(int argc, char *argv[])
                 }
 
                 case 'G':
-                    generateSymbolsTable = YES;
                     classDump.shouldProcessRecursively = YES;
                     classDump.shouldIterateInReverse = YES;
                     break;
@@ -214,16 +199,10 @@ int main(int argc, char *argv[])
                     // Last one wins now.
                     break;
                 }
-                    
                 case 'f': {
                     searchString = [NSString stringWithUTF8String:optarg];
                     break;
                 }
-                    
-                case 'H':
-                    shouldGenerateSeparateHeaders = YES;
-                    break;
-                    
                 case 'I':
                     classDump.shouldSortClassesByInheritance = YES;
                     break;
@@ -309,8 +288,8 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
 
-                if (hasSpecifiedArch == NO) {
-                    if ([file bestMatchForLocalArch:&targetArch] == NO) {
+                if (!hasSpecifiedArch) {
+                    if (![file bestMatchForLocalArch:&targetArch]) {
                         fprintf(stderr, "Error: Couldn't get local architecture\n");
                         exit(1);
                     }
@@ -329,33 +308,24 @@ int main(int argc, char *argv[])
                 } else {
                     [classDump processObjectiveCData];
                     [classDump registerTypes];
-                    
+
+                    CDCoreDataModelProcessor *coreDataModelProcessor = [[CDCoreDataModelProcessor alloc] init];
+                    [ignoreSymbols addObjectsFromArray:[coreDataModelProcessor coreDataModelSymbolsToExclude]];
+
                     if (searchString != nil) {
                         CDFindMethodVisitor *visitor = [[CDFindMethodVisitor alloc] init];
                         visitor.classDump = classDump;
                         visitor.searchString = searchString;
                         [classDump recursivelyVisit:visitor];
-                    } else if (generateSymbolsTable) {
-                        CDSymoblsGeneratorVisitor *visitor = [CDSymoblsGeneratorVisitor new];
+                    }
+                    else {
+                        CDSymbolsGeneratorVisitor *visitor = [CDSymbolsGeneratorVisitor new];
                         visitor.classDump = classDump;
                         visitor.classFilter = classFilter;
                         visitor.ignoreSymbols = ignoreSymbols;
                         [classDump recursivelyVisit:visitor];
                         CDXibStoryBoardProcessor *processor = [[CDXibStoryBoardProcessor alloc] init];
                         [processor obfuscateFilesUsingSymbols:visitor.symbols];
-//                        [parser obfuscateFilesUsingSymbols:visitor.symbols];
-                    } else if (shouldGenerateSeparateHeaders) {
-                        CDMultiFileVisitor *multiFileVisitor = [[CDMultiFileVisitor alloc] init];
-                        multiFileVisitor.classDump = classDump;
-                        classDump.typeController.delegate = multiFileVisitor;
-                        multiFileVisitor.outputPath = outputPath;
-                        [classDump recursivelyVisit:multiFileVisitor];
-                    } else {
-                        CDClassDumpVisitor *visitor = [[CDClassDumpVisitor alloc] init];
-                        visitor.classDump = classDump;
-                        if ([hiddenSections containsObject:@"structures"]) visitor.shouldShowStructureSection = NO;
-                        if ([hiddenSections containsObject:@"protocols"])  visitor.shouldShowProtocolSection  = NO;
-                        [classDump recursivelyVisit:visitor];
                     }
                 }
             }
